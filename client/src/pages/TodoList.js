@@ -26,7 +26,9 @@ function TodoList() {
     const fetchTasks = async () => {
       try {
         setIsLoading(true);
-        const response = await axios.get(`${API_URL}/tasks`);
+        const response = await axios.get(`${API_URL}/tasks`, {
+          params: { user_id: userId }
+        });
         setTasks(response.data);
       } catch (error) {
         console.error('Error fetching tasks:', error);
@@ -36,11 +38,15 @@ function TodoList() {
     };
     
     fetchTasks();
-  }, []);
+  }, [userId]);
   
   const handleCreateTask = async (taskData) => {
     try {
-      const response = await axios.post(`${API_URL}/tasks`, taskData);
+      const taskWithUserId = {
+        ...taskData,
+        user_id: userId
+      };
+      const response = await axios.post(`${API_URL}/tasks`, taskWithUserId);
       setTasks([...tasks, response.data]);
       setIsFormOpen(false);
     } catch (error) {
@@ -50,7 +56,11 @@ function TodoList() {
   
   const handleUpdateTask = async (taskData) => {
     try {
-      const response = await axios.put(`${API_URL}/tasks/${editingTask.id}`, taskData);
+      const taskWithUserId = {
+        ...taskData,
+        user_id: userId
+      };
+      const response = await axios.put(`${API_URL}/tasks/${editingTask.id}`, taskWithUserId);
       setTasks(tasks.map(task => task.id === editingTask.id ? response.data : task));
       setIsFormOpen(false);
       setEditingTask(null);
@@ -79,7 +89,7 @@ function TodoList() {
     const task = tasks.find(t => t.id === id);
     if (task) {
       try {
-        const updatedTask = { ...task, status: newStatus };
+        const updatedTask = { ...task, status: newStatus, user_id: userId };
         const response = await axios.put(`${API_URL}/tasks/${id}`, updatedTask);
         setTasks(tasks.map(t => t.id === id ? response.data : t));
       } catch (error) {
