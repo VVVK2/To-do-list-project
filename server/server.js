@@ -7,22 +7,26 @@ const path = require('path');
 const app = express();
 const PORT = process.env.PORT || 5001;
 
-
+// Middleware
 app.use(cors());
 app.use(bodyParser.json());
 
+// Connect to SQLite database
 const db = new sqlite3.Database('./tasks.db', (err) => {
   if (err) {
     console.error('Error connecting to database:', err.message);
   } else {
     console.log('Connected to the SQLite database.');
+    // Create tasks table if it doesn't exist
     db.run(`CREATE TABLE IF NOT EXISTS tasks (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       title TEXT NOT NULL,
       description TEXT,
       status TEXT DEFAULT 'To Do',
       due_date TEXT,
-      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      user_id INTEGER,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES users (id)
     )`);
     
     db.run(`CREATE TABLE IF NOT EXISTS users (
@@ -34,8 +38,18 @@ const db = new sqlite3.Database('./tasks.db', (err) => {
   }
 });
 
+// API Routes
+
+// Get all tasks
 app.get('/api/tasks', (req, res) => {
-  db.all('SELECT * FROM tasks ORDER BY due_date ASC', [], (err, rows) => {
+  const userId = req.query.user_id;
+  
+  if (!userId) {
+    res.status(400).json({ error: 'User ID is required' });
+    return;
+  }
+  
+  db.all('SELECT * FROM tasks WHERE user_id = ? ORDER BY due_date ASC', [userId], (err, rows) => {
     if (err) {
       res.status(500).json({ error: err.message });
       return;
@@ -44,6 +58,7 @@ app.get('/api/tasks', (req, res) => {
   });
 });
 
+// Get a single task
 app.get('/api/tasks/:id', (req, res) => {
   db.get('SELECT * FROM tasks WHERE id = ?', [req.params.id], (err, row) => {
     if (err) {
@@ -58,17 +73,23 @@ app.get('/api/tasks/:id', (req, res) => {
   });
 });
 
+// Create a new task
 app.post('/api/tasks', (req, res) => {
-  const { title, description, status, due_date } = req.body;
+  const { title, description, status, due_date, user_id } = req.body;
   
   if (!title) {
     res.status(400).json({ error: 'Title is required' });
     return;
   }
   
+  if (!user_id) {
+    res.status(400).json({ error: 'User ID is required' });
+    return;
+  }
+  
   db.run(
-    'INSERT INTO tasks (title, description, status, due_date) VALUES (?, ?, ?, ?)',
-    [title, description, status || 'To Do', due_date],
+    'INSERT INTO tasks (title, description, status, due_date, user_id) VALUES (?, ?, ?, ?, ?)',
+    [title, description, status || 'To Do', due_date, user_id],
     function (err) {
       if (err) {
         res.status(500).json({ error: err.message });
@@ -86,6 +107,7 @@ app.post('/api/tasks', (req, res) => {
   );
 });
 
+// Update a task
 app.put('/api/tasks/:id', (req, res) => {
   const { title, description, status, due_date } = req.body;
   
@@ -119,6 +141,7 @@ app.put('/api/tasks/:id', (req, res) => {
   );
 });
 
+// Delete a task
 app.delete('/api/tasks/:id', (req, res) => {
   db.run('DELETE FROM tasks WHERE id = ?', [req.params.id], function (err) {
     if (err) {
@@ -188,6 +211,7 @@ app.post('/api/login', (req, res) => {
   );
 });
 
+// Start the server
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 }); 
